@@ -10,6 +10,7 @@ import random
 import torch
 import torch.utils.data
 import numpy as np
+import torchaudio
 from librosa.util import normalize
 from scipy.io.wavfile import read
 from librosa.filters import mel as librosa_mel_fn
@@ -22,8 +23,9 @@ MAX_WAV_VALUE = 32768.0
 def load_wav(full_path, sr_target):
     sampling_rate, data = read(full_path)
     if sampling_rate != sr_target:
-        raise RuntimeError("Sampling rate of the file {} is {} Hz, but the model requires {} Hz".
-              format(full_path, sampling_rate, sr_target))
+        data = torch.tensor(data, dtype=torch.float32)
+        data = torchaudio.functional.resample(data, sampling_rate, sr_target)
+        data = data.numpy()
     return data, sampling_rate
 
 
@@ -151,9 +153,6 @@ class MelDataset(torch.utils.data.Dataset):
             if not self.fine_tuning:
                 audio = normalize(audio) * 0.95
             self.cached_wav = audio
-            if sampling_rate != self.sampling_rate:
-                raise ValueError("{} SR doesn't match target {} SR".format(
-                    sampling_rate, self.sampling_rate))
             self._cache_ref_count = self.n_cache_reuse
         else:
             audio = self.cached_wav
